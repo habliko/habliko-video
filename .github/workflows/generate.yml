@@ -1,1 +1,34 @@
+name: Habliko Video PoC
 
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: "0 8,18 * * *"
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Generar y renderizar reel
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          JSON2VIDEO_API_KEY: ${{ secrets.JSON2VIDEO_API_KEY }}
+          LANG_CODE: ${{ vars.LANG_CODE || 'es' }}
+        run: python main.py
+
+      - name: Subir el registro como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: last_run
+          path: last_run.json
+          if-no-files-found: ignore
