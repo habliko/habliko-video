@@ -19,7 +19,6 @@ def render_movie(movie: dict) -> tuple[str, float]:
         "Content-Type": "application/json",
     }
 
-    # 1) Lanzar el render
     r = requests.post(config.J2V_URL, headers=headers, json=movie, timeout=60)
     if r.status_code not in (200, 201):
         print(f"ERROR JSON2Video POST {r.status_code}: {r.text}", file=sys.stderr)
@@ -29,9 +28,8 @@ def render_movie(movie: dict) -> tuple[str, float]:
     if not project:
         print(f"ERROR: sin project id en la respuesta: {r.text}", file=sys.stderr)
         sys.exit(1)
-    print(f"Render lanzado. project={project}")
+    print(f"   Render lanzado. project={project}")
 
-    # 2) Polling hasta que termine
     for _ in range(120):                      # ~4 min máx (2s * 120)
         time.sleep(2)
         s = requests.get(

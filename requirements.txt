@@ -1,6 +1,6 @@
 requests>=2.31.0
 
-# Solo para la fase de subida a YouTube (opcional, no hace falta para el test gratis):
+# Solo para la fase de subida a YouTube (opcional, no hace falta para el render):
 # google-api-python-client>=2.100.0
 # google-auth>=2.23.0
 # google-auth-oauthlib>=1.1.0

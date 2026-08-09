@@ -1,8 +1,6 @@
 """
 Paso 4 (OPCIONAL, siguiente fase) — Sube el MP4 a YouTube como Short.
-Requiere OAuth del canal una vez (token.json). No se usa en el test gratis de render.
-
-Subida ~100 vídeos/día en el tramo gratuito de la YouTube Data API.
+Requiere OAuth del canal una vez (token.json). No se usa en el render.
 Instala: pip install google-api-python-client google-auth google-auth-oauthlib
 """
 import os
@@ -30,7 +28,6 @@ def upload_short(mp4_url: str, title: str, description: str, tags=None):
     )
     youtube = build("youtube", "v3", credentials=creds)
 
-    # Descargar el MP4 a un temporal
     tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
     with requests.get(mp4_url, stream=True, timeout=120) as resp:
         resp.raise_for_status()
@@ -43,10 +40,10 @@ def upload_short(mp4_url: str, title: str, description: str, tags=None):
             "title": title[:100],
             "description": description,
             "tags": tags or [],
-            "categoryId": "27",           # Educación
+            "categoryId": "27",
         },
         "status": {
-            "privacyStatus": "private",   # empieza en privado; revísalo antes de publicar
+            "privacyStatus": "private",
             "selfDeclaredMadeForKids": False,
         },
     }

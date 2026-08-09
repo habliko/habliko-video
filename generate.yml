@@ -1,0 +1,51 @@
+name: Habliko Video PoC
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Qué renderizar"
+        type: choice
+        default: "solo español (es)"
+        options:
+          - "solo español (es)"
+          - "los 8 idiomas (--all)"
+          - "dry-run 8 idiomas (0 créditos)"
+  # schedule:
+  #   - cron: "0 8,18 * * *"
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Elegir argumentos
+        id: args
+        run: |
+          case "${{ github.event.inputs.mode }}" in
+            "los 8 idiomas (--all)") echo "flags=--all" >> "$GITHUB_OUTPUT" ;;
+            "dry-run 8 idiomas (0 créditos)") echo "flags=--all --dry-run" >> "$GITHUB_OUTPUT" ;;
+            *) echo "flags=" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Generar y renderizar
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          JSON2VIDEO_API_KEY: ${{ secrets.JSON2VIDEO_API_KEY }}
+        run: python main.py ${{ steps.args.outputs.flags }}
+
+      - name: Subir registros como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: last_run
+          path: last_run_*.json
+          if-no-files-found: ignore

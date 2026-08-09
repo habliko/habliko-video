@@ -1,7 +1,7 @@
 """
-Paso 1 — Genera el guion del reel con Groq (gratis).
+Paso 1 — Genera el guion del reel con Groq (gratis), en el idioma indicado.
 Devuelve un dict con: scenes[], caption, hashtags.
-Cada escena trae 'voice_text' (lo que se narra) y 'on_screen' (texto en pantalla).
+Cada escena trae 'voice_text' (narración) y 'on_screen' (texto en pantalla).
 """
 import json
 import sys
@@ -17,16 +17,16 @@ SYSTEM = (
 )
 
 PROMPT_TEMPLATE = """\
-Escribe el guion de un reel vertical de ~30 segundos en {lang_name} sobre este tema:
+Escribe el guion de un reel vertical de ~15 segundos en {lang_name} sobre este tema:
 
 {topic}
 
 Marca: {brand} ({url}). Tono: cercano, motivador, nada agresivo.
 
 Estructura obligatoria: exactamente 3 escenas (gancho, desarrollo, llamada a la acción).
-- 'voice_text': lo que dice la voz en off (1-2 frases cortas, natural al hablar).
+- 'voice_text': lo que dice la voz en off (1 frase corta y natural al hablar).
 - 'on_screen': 3-6 palabras que aparecen en pantalla (NO repitas literalmente la voz).
-La suma de la narración debe caber holgada en ~30 segundos.
+Todo el texto (voz, on_screen, caption, hashtags) debe estar en {lang_name}.
 
 Devuelve SOLO este JSON:
 {{
@@ -41,13 +41,13 @@ Devuelve SOLO este JSON:
 """
 
 
-def generate() -> dict:
+def generate(lang: str) -> dict:
     if not config.GROQ_API_KEY:
         print("ERROR: falta GROQ_API_KEY en el entorno.", file=sys.stderr)
         sys.exit(1)
 
     prompt = PROMPT_TEMPLATE.format(
-        lang_name=config.LANG_NAMES.get(config.LANG, "español"),
+        lang_name=config.LANG_NAMES.get(lang, "español"),
         topic=config.TOPIC,
         brand=config.BRAND["name"],
         url=config.BRAND["url"],
@@ -60,7 +60,6 @@ def generate() -> dict:
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": prompt},
         ],
-        # Fuerza salida JSON en modelos compatibles con Groq.
         "response_format": {"type": "json_object"},
     }
     headers = {
@@ -70,22 +69,23 @@ def generate() -> dict:
 
     r = requests.post(config.GROQ_URL, headers=headers, json=payload, timeout=60)
     if r.status_code != 200:
-        print(f"ERROR Groq {r.status_code}: {r.text}", file=sys.stderr)
+        print(f"ERROR Groq {r.status_code} ({lang}): {r.text}", file=sys.stderr)
         sys.exit(1)
 
     content = r.json()["choices"][0]["message"]["content"].strip()
     try:
         data = json.loads(content)
     except json.JSONDecodeError:
-        print(f"ERROR: Groq no devolvió JSON válido:\n{content}", file=sys.stderr)
+        print(f"ERROR: Groq no devolvió JSON válido ({lang}):\n{content}", file=sys.stderr)
         sys.exit(1)
 
     if "scenes" not in data or not data["scenes"]:
-        print(f"ERROR: guion sin escenas: {data}", file=sys.stderr)
+        print(f"ERROR: guion sin escenas ({lang}): {data}", file=sys.stderr)
         sys.exit(1)
 
     return data
 
 
 if __name__ == "__main__":
-    print(json.dumps(generate(), ensure_ascii=False, indent=2))
+    lang = sys.argv[1] if len(sys.argv) > 1 else config.DEFAULT_LANG
+    print(json.dumps(generate(lang), ensure_ascii=False, indent=2))

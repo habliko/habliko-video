@@ -1,46 +1,49 @@
-# habliko-video (prueba de concepto)
+# habliko-video
 
 Fábrica de reels para Habliko, misma filosofía que tus repos de blog:
 **Groq (guion, gratis) → JSON2Video (voz Azure + render) → YouTube/TikTok**.
 
-Esta versión está calibrada para el **plan gratuito de JSON2Video** (600 s = 10 min/mes)
-y su único objetivo es **medir el consumo real de créditos** con tu plantilla y tu duración.
+Ahora en **8 idiomas en bucle**. Reels cortos (~13-15 s) para máximo volumen.
 
-## Flujo
+## Idiomas
 
-| Paso | Archivo | Coste |
-|------|---------|-------|
-| 1. Guion del reel | `generate_script.py` (Groq `gpt-oss-120b`) | 0 € |
-| 2. Montaje de la película | `build_movie.py` (1080×1920 vertical) | 0 € |
-| 3. Render + voz | `render.py` (JSON2Video, voz Azure incluida) | seg. de vídeo |
-| 4. Subida (siguiente fase) | `upload_youtube.py` | 0 € |
+| Idioma | Voz | Estado |
+|--------|-----|--------|
+| es, en, fr, de, it, pt, nl | Azure (gratis, incluida) | ✅ activo |
+| lb (luxemburgués) | Liesmaschinn (ZLS) | 🔌 hueco preparado, deferido |
 
-## Puesta en marcha (test gratis)
+El LB no tiene voz en Azure. Se salta automáticamente hasta que integres tu
+Liesmaschinn en `liesmaschinn.py` y pongas `LB_ENABLED = True` en `config.py`.
 
-1. Crea una cuenta gratis en JSON2Video y copia tu **API key**.
-2. En GitHub → *Settings → Secrets and variables → Actions*, añade:
-   - `GROQ_API_KEY` (tu clave Groq de siempre)
-   - `JSON2VIDEO_API_KEY` (la del plan gratis)
-3. (Opcional) prueba en local:
-   ```bash
-   pip install -r requirements.txt
-   cp .env.example .env      # rellena tus claves
-   export $(grep -v '^#' .env | xargs)
-   python main.py --dry-run  # solo guion, 0 créditos
-   python main.py            # genera el reel de verdad
-   ```
-4. O lánzalo desde la pestaña **Actions** con *Run workflow* (manual).
+## Uso
 
-Al terminar, la consola te dice:
-- la URL del MP4,
-- los **segundos = créditos** que ha costado,
-- cuántos reels como ese caben en el plan gratis y en Hobby.
+```bash
+python main.py                  # un idioma (config.DEFAULT_LANG = es)
+python main.py --lang fr        # un idioma concreto
+python main.py --all            # los 8 idiomas en bucle
+python main.py --all --dry-run  # genera los 8 guiones SIN renderizar (0 créditos)
+```
 
-## Notas
+Desde GitHub: pestaña **Actions → Habliko Video PoC → Run workflow**, y elige en el
+desplegable *mode*: solo español, los 8 idiomas, o dry-run de los 8 (0 créditos).
 
-- **Resolución:** 1080×1920 vertical = tarifa base (1 crédito/segundo). Nunca 4K.
-- **Voz:** Azure (gratis, incluida). Cubre ES/EN/FR/DE/IT/PT/NL.
-  El **luxemburgués** se resolverá aparte con tu Liesmaschinn (pista de audio propia).
-- **TikTok:** el módulo de publicación se añade en la siguiente fase
-  (borrador sin auditoría, o API auditada de terceros).
-- Todo lo que quieras cambiar (marca, colores, idioma, tema) está en `config.py`.
+Al terminar verás, por idioma, la URL del MP4 y los segundos = créditos, más un
+**resumen agregado** de cuántas tandas caben en gratis y en Hobby. Cada idioma deja
+su registro en `last_run_<lang>.json` (se suben como artefacto).
+
+## Consumo de referencia
+
+Con reels de ~13 s: una tanda de 7 idiomas (LB deferido) ≈ **90 s**.
+→ ~6 tandas completas en el plan gratis (600 s), ~33 en Hobby (3.000 s).
+
+## Ajustes
+
+Todo en `config.py`: marca y colores (`BRAND`), lista de idiomas (`LANGS`),
+voces Azure (`VOICES`), tema (`TOPIC`), flag `LB_ENABLED`, ritmo entre idiomas.
+
+## Pendiente (siguientes fases)
+
+- Integrar Liesmaschinn para el LB (`liesmaschinn.py` → `synthesize()`).
+- Subida a YouTube Shorts (`upload_youtube.py`, ya listo, OAuth una vez).
+- Publicación en TikTok (modo borrador sin auditoría, o API auditada de terceros).
+- Enchufar tu Foxi / logo desde `media.habliko.com` (`BRAND["logo_url"]`).
