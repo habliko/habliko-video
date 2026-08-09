@@ -1,14 +1,25 @@
 """
-Paso 1 — Genera el guion del reel con Groq (gratis), en el idioma indicado.
-Devuelve un dict con: scenes[], caption, hashtags.
-Cada escena trae 'voice_text' (narración) y 'on_screen' (texto en pantalla).
+Paso 1 — Genera el guion del reel, con CACHÉ para ahorrar tokens de Groq.
+
+Lógica:
+  1. Si hay guion cacheado y fresco (< CACHE_DAYS) -> se reutiliza (0 tokens).
+  2. Si no, se pide a Groq y se guarda en caché.
+  3. Si Groq falla (p. ej. rate-limit 429) pero hay caché aunque sea vieja -> se usa
+     esa en vez de romper la tanda.
+
+Para forzar guiones nuevos: variable de entorno REFRESH_GUION=1.
+La caché son archivos cache/guion_<lang>.json (el workflow los va guardando).
 """
 import json
+import os
 import sys
+import time
 import requests
 
 import config
 
+CACHE_DIR = getattr(config, "CACHE_DIR", "cache")
+CACHE_DAYS = float(getattr(config, "CACHE_DAYS", 30))
 
 SYSTEM = (
     "Eres un guionista de reels verticales muy directos para redes sociales. "
@@ -26,6 +37,9 @@ Marca: {brand} ({url}). Tono: cercano, motivador, nada agresivo.
 Estructura obligatoria: exactamente 3 escenas (gancho, desarrollo, llamada a la acción).
 - 'voice_text': lo que dice la voz en off (1 frase corta y natural al hablar).
 - 'on_screen': 3-6 palabras que aparecen en pantalla (NO repitas literalmente la voz).
+- La escena 3 (llamada a la acción) debe invitar a la persona a convertirse en
+  PROMOTOR/embajador de Habliko: transmite que "buscamos promotores" y anima a
+  visitar habliko.com. El 'on_screen' de la escena 3 debe ser tipo "Buscamos promotores".
 Todo el texto (voz, on_screen, caption, hashtags) debe estar en {lang_name}.
 
 Devuelve SOLO este JSON:
@@ -41,49 +55,82 @@ Devuelve SOLO este JSON:
 """
 
 
-def generate(lang: str) -> dict:
-    if not config.GROQ_API_KEY:
-        print("ERROR: falta GROQ_API_KEY en el entorno.", file=sys.stderr)
-        sys.exit(1)
+def _cache_path(lang):
+    return os.path.join(CACHE_DIR, f"guion_{lang}.json")
 
+
+def _load_cache(lang, max_age_days=None):
+    p = _cache_path(lang)
+    if not os.path.exists(p):
+        return None
+    try:
+        data = json.load(open(p, encoding="utf-8"))
+    except Exception:
+        return None
+    if max_age_days is not None:
+        age_days = (time.time() - data.get("_ts", 0)) / 86400.0
+        if age_days > max_age_days:
+            return None
+    return data.get("script")
+
+
+def _save_cache(lang, script):
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    with open(_cache_path(lang), "w", encoding="utf-8") as f:
+        json.dump({"_ts": time.time(), "lang": lang, "script": script},
+                  f, ensure_ascii=False, indent=2)
+
+
+def _call_groq(lang):
+    if not config.GROQ_API_KEY:
+        raise RuntimeError("falta GROQ_API_KEY")
     prompt = PROMPT_TEMPLATE.format(
         lang_name=config.LANG_NAMES.get(lang, "español"),
-        topic=config.TOPIC,
-        brand=config.BRAND["name"],
-        url=config.BRAND["url"],
+        topic=config.TOPIC, brand=config.BRAND["name"], url=config.BRAND["url"],
     )
-
     payload = {
-        "model": config.GROQ_MODEL,
-        "temperature": 0.7,
-        "messages": [
-            {"role": "system", "content": SYSTEM},
-            {"role": "user", "content": prompt},
-        ],
+        "model": config.GROQ_MODEL, "temperature": 0.7,
+        "messages": [{"role": "system", "content": SYSTEM},
+                     {"role": "user", "content": prompt}],
         "response_format": {"type": "json_object"},
     }
-    headers = {
-        "Authorization": f"Bearer {config.GROQ_API_KEY}",
-        "Content-Type": "application/json",
-    }
-
+    headers = {"Authorization": f"Bearer {config.GROQ_API_KEY}",
+               "Content-Type": "application/json"}
     r = requests.post(config.GROQ_URL, headers=headers, json=payload, timeout=60)
     if r.status_code != 200:
-        print(f"ERROR Groq {r.status_code} ({lang}): {r.text}", file=sys.stderr)
-        sys.exit(1)
-
+        raise RuntimeError(f"Groq {r.status_code}: {r.text[:180]}")
     content = r.json()["choices"][0]["message"]["content"].strip()
-    try:
-        data = json.loads(content)
-    except json.JSONDecodeError:
-        print(f"ERROR: Groq no devolvió JSON válido ({lang}):\n{content}", file=sys.stderr)
-        sys.exit(1)
-
+    data = json.loads(content)
     if "scenes" not in data or not data["scenes"]:
-        print(f"ERROR: guion sin escenas ({lang}): {data}", file=sys.stderr)
-        sys.exit(1)
-
+        raise RuntimeError("guion sin escenas")
     return data
+
+
+def generate(lang: str, force: bool = False) -> dict:
+    force = force or os.environ.get("REFRESH_GUION") == "1"
+
+    # 1) Caché fresca (salvo que forcemos)
+    if not force:
+        cached = _load_cache(lang, CACHE_DAYS)
+        if cached:
+            print(f"   guion en caché (0 tokens Groq) [{lang}]")
+            return cached
+
+    # 2) Pedir a Groq
+    try:
+        script = _call_groq(lang)
+        _save_cache(lang, script)
+        print(f"   guion nuevo de Groq, cacheado [{lang}]")
+        return script
+    except Exception as e:
+        # 3) Red de seguridad: usar caché aunque sea vieja
+        cached = _load_cache(lang, None)
+        if cached:
+            print(f"   [aviso] Groq falló ({e}); uso guion en caché [{lang}]",
+                  file=sys.stderr)
+            return cached
+        print(f"ERROR Groq y sin caché para [{lang}]: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
