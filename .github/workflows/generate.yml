@@ -4,13 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "Qué renderizar"
+        description: "Qué hacer"
         type: choice
         default: "solo español (es)"
         options:
           - "solo español (es)"
           - "los 8 idiomas (--all)"
           - "dry-run 8 idiomas (0 créditos)"
+          - "8 idiomas + subir a YouTube (--all --publish)"
   # schedule:
   #   - cron: "0 8,18 * * *"
 
@@ -33,13 +34,17 @@ jobs:
           case "${{ github.event.inputs.mode }}" in
             "los 8 idiomas (--all)") echo "flags=--all" >> "$GITHUB_OUTPUT" ;;
             "dry-run 8 idiomas (0 créditos)") echo "flags=--all --dry-run" >> "$GITHUB_OUTPUT" ;;
+            "8 idiomas + subir a YouTube (--all --publish)") echo "flags=--all --publish" >> "$GITHUB_OUTPUT" ;;
             *) echo "flags=" >> "$GITHUB_OUTPUT" ;;
           esac
 
-      - name: Generar y renderizar
+      - name: Generar, renderizar y (opcional) publicar
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           JSON2VIDEO_API_KEY: ${{ secrets.JSON2VIDEO_API_KEY }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
         run: python main.py ${{ steps.args.outputs.flags }}
 
       - name: Subir registros como artefacto
