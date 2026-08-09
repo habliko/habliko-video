@@ -12,8 +12,12 @@ on:
           - "los 8 idiomas (--all)"
           - "dry-run 8 idiomas (0 créditos)"
           - "8 idiomas + subir a YouTube (--all --publish)"
+          - "refrescar guiones (Groq, 0 créditos)"
   # schedule:
   #   - cron: "0 8,18 * * *"
+
+permissions:
+  contents: write
 
 jobs:
   generate:
@@ -31,12 +35,16 @@ jobs:
       - name: Elegir argumentos
         id: args
         run: |
+          REFRESH=0
           case "${{ github.event.inputs.mode }}" in
-            "los 8 idiomas (--all)") echo "flags=--all" >> "$GITHUB_OUTPUT" ;;
-            "dry-run 8 idiomas (0 créditos)") echo "flags=--all --dry-run" >> "$GITHUB_OUTPUT" ;;
-            "8 idiomas + subir a YouTube (--all --publish)") echo "flags=--all --publish" >> "$GITHUB_OUTPUT" ;;
-            *) echo "flags=" >> "$GITHUB_OUTPUT" ;;
+            "los 8 idiomas (--all)") FLAGS="--all" ;;
+            "dry-run 8 idiomas (0 créditos)") FLAGS="--all --dry-run" ;;
+            "8 idiomas + subir a YouTube (--all --publish)") FLAGS="--all --publish" ;;
+            "refrescar guiones (Groq, 0 créditos)") FLAGS="--all --dry-run"; REFRESH=1 ;;
+            *) FLAGS="" ;;
           esac
+          echo "flags=$FLAGS" >> "$GITHUB_OUTPUT"
+          echo "refresh=$REFRESH" >> "$GITHUB_OUTPUT"
 
       - name: Generar, renderizar y (opcional) publicar
         env:
@@ -45,7 +53,21 @@ jobs:
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          REFRESH_GUION: ${{ steps.args.outputs.refresh }}
         run: python main.py ${{ steps.args.outputs.flags }}
+
+      - name: Guardar caché de guiones
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cache -A
+          if git diff --cached --quiet; then
+            echo "sin cambios en la caché"
+          else
+            git commit -m "cache: guiones actualizados [skip ci]"
+            git push || echo "no se pudo empujar la caché (revisar permisos)"
+          fi
 
       - name: Subir registros como artefacto
         if: always()
