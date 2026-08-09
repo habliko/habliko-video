@@ -1,49 +1,59 @@
 # habliko-video
 
 Fábrica de reels para Habliko, misma filosofía que tus repos de blog:
-**Groq (guion, gratis) → JSON2Video (voz Azure + render) → YouTube/TikTok**.
+**Groq (guion, gratis) → JSON2Video (voz Azure + render) → YouTube Shorts**.
 
-Ahora en **8 idiomas en bucle**. Reels cortos (~13-15 s) para máximo volumen.
+8 idiomas en bucle. Reels cortos (~13 s) para máximo volumen.
 
 ## Idiomas
 
 | Idioma | Voz | Estado |
 |--------|-----|--------|
-| es, en, fr, de, it, pt, nl | Azure (gratis, incluida) | ✅ activo |
-| lb (luxemburgués) | Liesmaschinn (ZLS) | 🔌 hueco preparado, deferido |
-
-El LB no tiene voz en Azure. Se salta automáticamente hasta que integres tu
-Liesmaschinn en `liesmaschinn.py` y pongas `LB_ENABLED = True` en `config.py`.
+| es, en, fr, de, it, pt, nl | Azure (gratis, incluida) | activo |
+| lb (luxemburgués) | Liesmaschinn (ZLS) | hueco preparado, deferido |
 
 ## Uso
 
 ```bash
-python main.py                  # un idioma (config.DEFAULT_LANG = es)
-python main.py --lang fr        # un idioma concreto
-python main.py --all            # los 8 idiomas en bucle
-python main.py --all --dry-run  # genera los 8 guiones SIN renderizar (0 créditos)
+python main.py                   # un idioma (config.DEFAULT_LANG = es)
+python main.py --lang fr         # un idioma concreto
+python main.py --all             # los 8 idiomas (sin subir)
+python main.py --all --publish   # los 8 idiomas + subir a YouTube Shorts (privado)
+python main.py --all --dry-run   # solo guiones, sin renderizar (0 créditos)
 ```
 
-Desde GitHub: pestaña **Actions → Habliko Video PoC → Run workflow**, y elige en el
-desplegable *mode*: solo español, los 8 idiomas, o dry-run de los 8 (0 créditos).
+Desde GitHub: Actions -> Habliko Video PoC -> Run workflow, elige el modo.
+Cada idioma deja last_run_<lang>.json (URL del MP4, del Short y metadatos).
 
-Al terminar verás, por idioma, la URL del MP4 y los segundos = créditos, más un
-**resumen agregado** de cuántas tandas caben en gratis y en Hobby. Cada idioma deja
-su registro en `last_run_<lang>.json` (se suben como artefacto).
+## Publicación en YouTube (configuración única)
+
+La API de YouTube exige autorizar OAuth UNA vez. Después el cron sube solo con un
+refresh token guardado como secret. Pasos resumidos:
+
+1. Google Cloud: crea un proyecto y activa YouTube Data API v3.
+2. Pantalla de consentimiento OAuth (Externo): añade tu cuenta como test user y
+   PUBLICA la app ("In production") para que el refresh token NO caduque a los 7
+   días. Scope: .../auth/youtube.upload
+3. Credenciales -> OAuth client tipo "Web application". En Authorized redirect URIs
+   añade https://developers.google.com/oauthplayground . Copia Client ID y Secret.
+4. Consigue el refresh token (una vía):
+   - OAuth Playground (sin Python): rueda dentada -> "Use your own OAuth credentials",
+     pega ID y Secret; escribe el scope de youtube.upload, Authorize APIs, inicia
+     sesión con la cuenta del canal, Exchange authorization code for tokens -> copia
+     el refresh token.
+   - En local: python auth_youtube.py (necesita client_secret.json).
+5. GitHub -> Secrets: añade YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN.
+6. Lanza el modo "8 idiomas + subir a YouTube (--all --publish)".
+
+Las subidas van en PRIVADO por defecto (config.PUBLISH_PRIVACY): revisas y luego
+las pasas a público o las programas. Los verticales < 60 s son Shorts (se añade #Shorts).
 
 ## Consumo de referencia
 
-Con reels de ~13 s: una tanda de 7 idiomas (LB deferido) ≈ **90 s**.
-→ ~6 tandas completas en el plan gratis (600 s), ~33 en Hobby (3.000 s).
+Tanda de 7 idiomas (~13 s c/u) ~= 92 créditos -> ~6 tandas en gratis, ~32 en Hobby.
 
-## Ajustes
+## Pendiente
 
-Todo en `config.py`: marca y colores (`BRAND`), lista de idiomas (`LANGS`),
-voces Azure (`VOICES`), tema (`TOPIC`), flag `LB_ENABLED`, ritmo entre idiomas.
-
-## Pendiente (siguientes fases)
-
-- Integrar Liesmaschinn para el LB (`liesmaschinn.py` → `synthesize()`).
-- Subida a YouTube Shorts (`upload_youtube.py`, ya listo, OAuth una vez).
-- Publicación en TikTok (modo borrador sin auditoría, o API auditada de terceros).
-- Enchufar tu Foxi / logo desde `media.habliko.com` (`BRAND["logo_url"]`).
+- Integrar Liesmaschinn para el LB (liesmaschinn.py -> synthesize()).
+- Publicación en TikTok (borrador sin auditoría, o API auditada de terceros).
+- Enchufar Foxi / logo desde media.habliko.com (BRAND["logo_url"]).

@@ -1,6 +1,8 @@
 """
-Paso 4 (OPCIONAL, siguiente fase) — Sube el MP4 a YouTube como Short.
-Requiere OAuth del canal una vez (token.json). No se usa en el render.
+Sube un MP4 a YouTube como Short usando un refresh token (sin navegador en CI).
+Requiere los secrets: YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN.
+El refresh token se obtiene UNA vez (ver README / auth_youtube.py).
+
 Instala: pip install google-api-python-client google-auth google-auth-oauthlib
 """
 import os
@@ -8,51 +10,66 @@ import sys
 import tempfile
 import requests
 
+import config
 
-def upload_short(mp4_url: str, title: str, description: str, tags=None):
-    try:
-        from googleapiclient.discovery import build
-        from googleapiclient.http import MediaFileUpload
-        from google.oauth2.credentials import Credentials
-    except ImportError:
-        print("Instala las libs de Google para usar la subida a YouTube.", file=sys.stderr)
+SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+
+
+def _service():
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+
+    if not (config.YT_CLIENT_ID and config.YT_CLIENT_SECRET and config.YT_REFRESH_TOKEN):
+        print("ERROR: faltan YT_CLIENT_ID / YT_CLIENT_SECRET / YT_REFRESH_TOKEN.",
+              file=sys.stderr)
         sys.exit(1)
 
-    token_file = os.environ.get("YT_TOKEN_FILE", "token.json")
-    if not os.path.exists(token_file):
-        print(f"ERROR: no existe {token_file} (autoriza el canal una vez).", file=sys.stderr)
-        sys.exit(1)
-
-    creds = Credentials.from_authorized_user_file(
-        token_file, ["https://www.googleapis.com/auth/youtube.upload"]
+    creds = Credentials(
+        token=None,
+        refresh_token=config.YT_REFRESH_TOKEN,
+        client_id=config.YT_CLIENT_ID,
+        client_secret=config.YT_CLIENT_SECRET,
+        token_uri="https://oauth2.googleapis.com/token",
+        scopes=SCOPES,
     )
-    youtube = build("youtube", "v3", credentials=creds)
+    return build("youtube", "v3", credentials=creds)
 
+
+def upload_short(mp4_url: str, title: str, description: str,
+                 tags=None, privacy: str = None) -> str:
+    from googleapiclient.http import MediaFileUpload
+
+    privacy = privacy or config.PUBLISH_PRIVACY
+    youtube = _service()
+
+    # Descargar el MP4 desde el CDN de JSON2Video a un temporal
     tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
-    with requests.get(mp4_url, stream=True, timeout=120) as resp:
-        resp.raise_for_status()
-        for chunk in resp.iter_content(chunk_size=8192):
+    with requests.get(mp4_url, stream=True, timeout=180) as r:
+        r.raise_for_status()
+        for chunk in r.iter_content(chunk_size=8192):
             tmp.write(chunk)
     tmp.close()
 
     body = {
         "snippet": {
             "title": title[:100],
-            "description": description,
-            "tags": tags or [],
-            "categoryId": "27",
+            "description": description[:5000],
+            "tags": (tags or [])[:15],
+            "categoryId": config.YT_CATEGORY_ID,
         },
         "status": {
-            "privacyStatus": "private",
+            "privacyStatus": privacy,
             "selfDeclaredMadeForKids": False,
         },
     }
 
     media = MediaFileUpload(tmp.name, mimetype="video/mp4", resumable=True)
-    req = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
-    resp = req.execute()
+    resp = youtube.videos().insert(
+        part="snippet,status", body=body, media_body=media
+    ).execute()
     os.unlink(tmp.name)
 
     vid = resp.get("id")
-    print(f"Subido a YouTube: https://youtu.be/{vid} (privado)")
-    return vid
+    url = f"https://youtu.be/{vid}"
+    print(f"   YouTube ({privacy}): {url}")
+    return url
