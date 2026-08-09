@@ -25,28 +25,37 @@ VIDEO_QUALITY = "high"
 MEDIA_BASE = "https://media.habliko.com"
 
 # Logo (carpeta habliko-media/habliko/logos/). Pon el NOMBRE REAL del archivo:
-LOGO_URL = f"{MEDIA_BASE}/habliko/logos/Foxi sin fondo 500x500.png"   # <-- ajusta el nombre
+LOGO_URL = f"{MEDIA_BASE}/habliko/logos/logo.png"   # <-- ajusta el nombre
 
 # Música (carpeta habliko-media/musica/): 3 pistas, se elige una AL AZAR por reel.
 # Pon los NOMBRES REALES de tus 3 archivos:
 MUSIC_URLS = [
-    f"{MEDIA_BASE}/musica/background-music-advertising-30-sec-357379.mp3",              # <-- ajusta el nombre
-    f"{MEDIA_BASE}/musica/mondamusic-energetic-sports-sport-512828.mp3",              # <-- ajusta el nombre
-    f"{MEDIA_BASE}/musica/tatamusic-advertising-background-music-426849.mp3",              # <-- ajusta el nombre
+    f"{MEDIA_BASE}/musica/track1.mp3",              # <-- ajusta el nombre
+    f"{MEDIA_BASE}/musica/track2.mp3",              # <-- ajusta el nombre
+    f"{MEDIA_BASE}/musica/track3.mp3",              # <-- ajusta el nombre
 ]
-MUSIC_VOLUME = 0.2                                  # bajita bajo la voz (0-1)
+MUSIC_VOLUME = 0.2
+BG_VIDEO_VOLUME = 0.7          # volumen del audio del MP4 de fondo, bajo la voz                                  # bajita bajo la voz (0-1)
 
-# Foxi (opcional, aparte del logo). Vacío = no aparece.
-FOXI_URL = os.environ.get("FOXI_URL", "")
+# Fondos (carpeta habliko-media/fondos/): PNG 1080x1920 SIN texto, se elige uno
+# AL AZAR por reel. Deja la lista vacía para usar el fondo tinta plano.
+BG_URLS = [
+    f"{MEDIA_BASE}/fondos/fondo1.mp4",     # <-- sube AQUÍ el 2º vídeo con este nombre
+    # f"{MEDIA_BASE}/fondos/fondo2.mp4",
+]
+
+# Foxi (personaje, aparte del logo). Sube el PNG transparente a tu R2 y ajusta el nombre.
+# Ruta sugerida: habliko-media/habliko/foxi/foxi.png
+FOXI_URL = os.environ.get("FOXI_URL", f"{MEDIA_BASE}/habliko/foxi/foxi.png")
 
 # --- Marca Habliko :: estilo "Ink moderno" ---------------------------------
 BRAND = {
     "name": "Habliko",
     "url": "habliko.com",
-    "bg_color": "#101828",
-    "text_color": "#F8FAFC",
-    "accent_color": "#22D3AA",
-    "caption_color": "#CBD5E1",
+    "bg_color": "#EDE7DD",        # fallback claro (el vídeo lo cubre)
+    "text_color": "#14213D",      # texto OSCURO para fondos claros
+    "accent_color": "#0E7C6B",    # teal que lee sobre blanco
+    "caption_color": "#334155",
     "font": "Inter",
     "logo_url": LOGO_URL,
 }
