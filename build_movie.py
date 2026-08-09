@@ -96,29 +96,29 @@ def _is_video(url):
 
 # ---------- modo 1: fondo VÍDEO, una sola escena ----------
 def _text_left(text, start, duration, y, size="74px", weight="800",
-               color=None, valign="top", height=560):
-    """Texto en la COLUMNA IZQUIERDA (zona limpia de fondos con sujeto a la derecha)."""
+               color=None, valign="top", height=560, x=60, width=640, align="left"):
+    """Texto posicionable (izquierda por defecto; align='center' para centrar)."""
     b = config.BRAND
     return {
         "type": "text", "text": text or "", "start": start, "duration": duration,
-        "x": 60, "y": y, "width": 640, "height": height,
+        "x": x, "y": y, "width": width, "height": height,
         "settings": {
             "font-family": b["font"], "font-size": size, "font-weight": weight,
-            "color": color or b["text_color"], "text-align": "left",
-            "horizontal-align": "left", "vertical-align": valign, "line-height": "1.15",
+            "color": color or b["text_color"], "text-align": align,
+            "horizontal-align": align, "vertical-align": valign, "line-height": "1.15",
         },
     }
 
 
-def _blink(text, base_start, y, size, color):
+def _blink(text, base_start, y, size, color, x=60, width=640, align="left"):
     """'Buscamos promotores' destella 2 veces y luego se queda fijo hasta el final."""
     els, t, on, off = [], base_start, 0.3, 0.3
     for _ in range(2):                       # 2 destellos
-        els.append(_text_left(text, round(t, 2), on, y=y, size=size,
-                              color=color, height=200))
+        els.append(_text_left(text, round(t, 2), on, y=y, size=size, color=color,
+                              height=200, x=x, width=width, align=align))
         t += on + off
-    els.append(_text_left(text, round(t, 2), -1, y=y, size=size,
-                          color=color, height=200))   # fijo al final
+    els.append(_text_left(text, round(t, 2), -1, y=y, size=size, color=color,
+                          height=200, x=x, width=width, align=align))   # fijo al final
     return els
 
 
@@ -137,13 +137,15 @@ def _build_video_bg(script, lang, bg, voice):
     if len(script["scenes"]) > 1:
         elements.append(_text_left(script["scenes"][1].get("on_screen", ""), 4.5, END - 4.5, y=240))
 
-    # Tarjeta final: "Buscamos promotores" con PARPADEO + web + mail (fijos al cierre)
+    # Tarjeta final CENTRADA (sobre la zona despejada): promotores + web + mail
     promoter = _CTA_PROMOTER.get(lang, _CTA_PROMOTER["es"])
-    elements.extend(_blink(promoter, END, y=980, size="60px", color=b["accent_color"]))
-    elements.append(_text_left(b["url"], END, -1, y=1110, size="54px",
-                               weight="800", color=b["text_color"], height=160))
-    elements.append(_text_left(_EMAIL, END, -1, y=1205, size="46px",
-                               weight="700", color=b["text_color"], height=160))
+    CX, CW = 90, 900                         # caja centrada horizontalmente
+    elements.extend(_blink(promoter, END, y=860, size="60px",
+                           color=b["accent_color"], x=CX, width=CW, align="center"))
+    elements.append(_text_left(b["url"], END, -1, y=1000, size="54px", weight="800",
+                               color=b["text_color"], height=160, x=CX, width=CW, align="center"))
+    elements.append(_text_left(_EMAIL, END, -1, y=1095, size="46px", weight="700",
+                               color=b["text_color"], height=160, x=CX, width=CW, align="center"))
 
     movie = {
         "resolution": "custom", "width": W, "height": H,
@@ -206,7 +208,7 @@ def _build_multiscene(script, lang, bg, voice, is_lb):
 
 
 def build_movie(script: dict, lang: str) -> dict:
-    print("[build_movie v6: fondo-video + promotores + parpadeo + mail, SIN Foxi]")
+    print("[build_movie v7: fondo-video + promotores + parpadeo + mail, SIN Foxi]")
     is_lb = lang == "lb"
     voice = config.VOICES.get(lang)
     if not is_lb and not voice:
