@@ -40,8 +40,8 @@ BG_VIDEO_VOLUME = 0.7          # volumen del audio del MP4 de fondo, bajo la voz
 # Fondos (carpeta habliko-media/fondos/): PNG 1080x1920 SIN texto, se elige uno
 # AL AZAR por reel. Deja la lista vacía para usar el fondo tinta plano.
 BG_URLS = [
-    f"{MEDIA_BASE}/fondos/fondo1.mp4",     # <-- sube AQUÍ el 2º vídeo con este nombre
-    # f"{MEDIA_BASE}/fondos/fondo2.mp4",
+    f"{MEDIA_BASE}/habliko/fondos/fondo1.mp4",   # bajo habliko/ (mismo prefijo que Foxi/logo)
+    # f"{MEDIA_BASE}/habliko/fondos/fondo2.mp4",
 ]
 
 # Foxi (personaje, aparte del logo). Sube el PNG transparente a tu R2 y ajusta el nombre.
