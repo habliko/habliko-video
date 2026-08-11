@@ -81,29 +81,47 @@ def _save_cache(lang, script):
                   f, ensure_ascii=False, indent=2)
 
 
-def _call_groq(lang):
-    if not config.GROQ_API_KEY:
-        raise RuntimeError("falta GROQ_API_KEY")
+def _call_llm(lang):
+    """Genera el guion probando los proveedores en orden (Cerebras -> Groq).
+    Si uno da 429 (cupo), salta al siguiente. Solo usa los que tengan key."""
     prompt = PROMPT_TEMPLATE.format(
         lang_name=config.LANG_NAMES.get(lang, "español"),
         topic=config.TOPIC, brand=config.BRAND["name"], url=config.BRAND["url"],
     )
-    payload = {
-        "model": config.GROQ_MODEL, "temperature": 0.7,
-        "messages": [{"role": "system", "content": SYSTEM},
-                     {"role": "user", "content": prompt}],
-        "response_format": {"type": "json_object"},
-    }
-    headers = {"Authorization": f"Bearer {config.GROQ_API_KEY}",
-               "Content-Type": "application/json"}
-    r = requests.post(config.GROQ_URL, headers=headers, json=payload, timeout=60)
-    if r.status_code != 200:
-        raise RuntimeError(f"Groq {r.status_code}: {r.text[:180]}")
-    content = r.json()["choices"][0]["message"]["content"].strip()
-    data = json.loads(content)
-    if "scenes" not in data or not data["scenes"]:
-        raise RuntimeError("guion sin escenas")
-    return data
+    active = [p for p in config.AI_PROVIDERS if p.get("key")]
+    if not active:
+        raise RuntimeError("falta al menos una API key (CEREBRAS_API_KEY / GROQ_API_KEY)")
+
+    last_err = None
+    for prov in active:
+        payload = {
+            "model": prov["model"], "temperature": 0.7,
+            "messages": [{"role": "system", "content": SYSTEM},
+                         {"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},
+        }
+        headers = {"Authorization": f"Bearer {prov['key']}",
+                   "Content-Type": "application/json"}
+        try:
+            r = requests.post(prov["url"], headers=headers, json=payload, timeout=60)
+        except Exception as e:
+            last_err = e
+            continue
+        if r.status_code == 429:
+            print(f"   {prov['name']} dio 429; pruebo el siguiente...", file=sys.stderr)
+            last_err = RuntimeError(f"{prov['name']} 429")
+            continue
+        if r.status_code != 200:
+            last_err = RuntimeError(f"{prov['name']} {r.status_code}: {r.text[:180]}")
+            continue
+        content = r.json()["choices"][0]["message"]["content"].strip()
+        data = json.loads(content)
+        if "scenes" not in data or not data["scenes"]:
+            raise RuntimeError("guion sin escenas")
+        if prov is not active[0]:
+            print(f"   (respaldo: {prov['name']})")
+        return data
+    raise last_err or RuntimeError("Fallo la generacion en todos los proveedores")
 
 
 def generate(lang: str, force: bool = False) -> dict:
@@ -116,11 +134,11 @@ def generate(lang: str, force: bool = False) -> dict:
             print(f"   guion en caché (0 tokens Groq) [{lang}]")
             return cached
 
-    # 2) Pedir a Groq
+    # 2) Pedir a la IA (Cerebras -> Groq)
     try:
-        script = _call_groq(lang)
+        script = _call_llm(lang)
         _save_cache(lang, script)
-        print(f"   guion nuevo de Groq, cacheado [{lang}]")
+        print(f"   guion nuevo generado y cacheado [{lang}]")
         return script
     except Exception as e:
         # 3) Red de seguridad: usar caché aunque sea vieja
