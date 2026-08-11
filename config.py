@@ -6,6 +6,7 @@ import os
 
 # --- Claves (desde entorno / GitHub Secrets) -------------------------------
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY", "")
 JSON2VIDEO_API_KEY = os.environ.get("JSON2VIDEO_API_KEY", "")
 YT_CLIENT_ID = os.environ.get("YT_CLIENT_ID", "")
 YT_CLIENT_SECRET = os.environ.get("YT_CLIENT_SECRET", "")
@@ -15,6 +16,24 @@ YT_REFRESH_TOKEN = os.environ.get("YT_REFRESH_TOKEN", "")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "openai/gpt-oss-120b"
 J2V_URL = "https://api.json2video.com/v2/movies"
+
+# Proveedores de IA en orden (Cerebras principal + Groq respaldo, mismo modelo).
+# Se prueban en orden; si uno da 429 salta al siguiente. Solo se usa el que
+# tenga API key definida.  Cerebras: 1M tok/dia | Groq: 200k tok/dia
+AI_PROVIDERS = [
+    {
+        "name": "cerebras",
+        "url": "https://api.cerebras.ai/v1/chat/completions",
+        "key": CEREBRAS_API_KEY,
+        "model": "gpt-oss-120b",
+    },
+    {
+        "name": "groq",
+        "url": GROQ_URL,
+        "key": GROQ_API_KEY,
+        "model": GROQ_MODEL,
+    },
+]
 
 # --- Formato del reel ------------------------------------------------------
 VIDEO_WIDTH = 1080
@@ -83,7 +102,8 @@ LB_ENABLED = False
 PAUSE_BETWEEN = 2
 
 # --- Publicación en YouTube ------------------------------------------------
-PUBLISH_PRIVACY = os.environ.get("PUBLISH_PRIVACY", "private")
+# "public" = se publica directo | "unlisted" = oculto con enlace | "private" = solo tú
+PUBLISH_PRIVACY = os.environ.get("PUBLISH_PRIVACY", "public")
 YT_CATEGORY_ID = "27"
 
 TOPIC = os.environ.get(
